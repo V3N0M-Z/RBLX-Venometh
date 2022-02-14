@@ -12,11 +12,10 @@ function tween.new(object, tweenData, tweenValues)
 	}, tween)
 end
 
-function tween:Wait(arnewThread, callback, ...)
-	local args = {...}
+function tween:Wait(newThread, callback, ...)
 	local function func()
 		self._tween.Completed:Wait()
-		if callback then callback(unpack(args)) end
+		if callback then callback(...) end
 	end
 	if newThread then
 		task.spawn(func)
