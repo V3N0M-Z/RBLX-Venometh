@@ -106,9 +106,9 @@ str.__call = function(t, ...)
 	return t
 end
 
-str.__index = function(t, callback, ...)
+str.__index = function(t, method, ...)
 	return function(...) 
-		return string[callback](t._str, ...)
+		return string[method](t._str, ...)
 	end
 end
 
