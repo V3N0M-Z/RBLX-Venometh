@@ -10,10 +10,12 @@ str "string"
 
 CREATE WITH FORMAT
 
-str(string | str, ...: string | str)
+str(format-string: string | str, ...: string | str)
 
 
 USING BUILT-IN STRING METHODS
+
+(Use any built-in string method with first param passed automatically)
 
 str.upper()
 
