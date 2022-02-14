@@ -316,7 +316,7 @@ function Venometh:AddPackages(packages)
 		if self._isServer then table.insert(self._packageDump, module) end
 		self._packages[module.Name] = function(ven, included)
 			local p = require(module)
-			if p["__initialize__"] then
+			if type(p) == "table" and p["__initialize__"] then
 				return p["__initialize__"](ven, included)
 			else
 				return p
