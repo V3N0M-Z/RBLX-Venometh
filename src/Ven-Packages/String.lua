@@ -60,7 +60,7 @@ str * <number>
 
 INDEX (string.sub)
 
-str ^ <start>.<end>
+str-<start>.<end>
 
 
 ]]
