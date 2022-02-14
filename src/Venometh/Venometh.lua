@@ -1,3 +1,5 @@
+--CREATED BY @V3N0M_Z
+--GITHUB: https://github.com/V3N0M-Z/RBLX-Venometh
 
 --List of services
 local services = {
@@ -120,10 +122,10 @@ local services = {
 --Used to get objects from stored Containers
 local function getObject(tab, index)
 	local source = string.sub(index, 4)
-	
+
 	--Return if no valid Container is found
 	if not tab._containers[source] then return end
-	
+
 	--Server handler for Container
 	if tab._isServer then
 		local protected, shared = tab._containers[source].Protected, tab._containers[source].Shared
@@ -140,8 +142,8 @@ local function getObject(tab, index)
 				return retrieved
 			end
 		end
-		
-	--Client handler for Container
+
+		--Client handler for Container
 	else
 		return function(ven, instance, limit) return tab._containers[source].Shared:WaitForChild(instance, limit or 7) end
 	end
@@ -155,15 +157,15 @@ local Venometh = {_services = (
 			t[service] = game:GetService(service)
 		end
 		return t
-	end
-)()}
+	end)()
+}
 Venometh.__index = function(tab, index)
 	return (string.sub(index, 1, 3) == "Get" and getObject(tab, index)) or Venometh._services[index] or Venometh[index]
 end
 
 --Framework instantiator
 function Venometh.__initialize__()
-	
+
 	--Initialize variables
 	local self = setmetatable({
 		_packages = {};
@@ -172,7 +174,7 @@ function Venometh.__initialize__()
 		_loaded = false;
 	}, Venometh)
 	self._isServer = self.RunService:IsServer()
-	
+
 	--Reference to Venometh.Packages
 	self.Packages = setmetatable({}, {
 		__index  = function(tab, index)
@@ -182,26 +184,34 @@ function Venometh.__initialize__()
 			return self._packages[index]
 		end;
 	})
-		
+
 	--Setup communication between the client/server Venometh Framework
 	if self._isServer then
+		
 		self._remoteE = self.new("RemoteEvent", self.ReplicatedStorage).Name("__event__").get
 		self._remoteF = self.new("RemoteFunction", self.ReplicatedStorage).Name("__function__").get
+		
 		self._remoteF.OnServerInvoke = function(client, action, ...)
 			repeat task.wait() until self._loaded
 			if action == "GetContainers" then
-					return self._containers
+				return self._containers
 			elseif action == "GetPackages" then
 				return self._packageDump
-			elseif action == "GetCommunicator" then
-				return {
-					_events = self._packages["Network"]._communicators[...]._events;
-					_functions = self._packages["Network"]._communicators[...]._functions;
-				}
+			elseif action == "GetRemote" then
+				
+				--[[OLDER METHOD]]
+				--elseif action == "GetCommunicator" then
+				--	return {
+				--		_events = self._packages["Network"]._communicators[...]._events;
+				--		_functions = self._packages["Network"]._communicators[...]._functions;
+				--	}
+				local network = self._packages["Network"]
+				local comm, remote = ...
+				return network._communicators[comm]._events[remote] or network._communicators[comm]._functions[remote]
+				
 			end
 		end
-		
-	--Get as required from to server to the client Venometh Framework
+
 	else
 		self._remoteF = self.ReplicatedStorage:WaitForChild("__function__")
 		self._remoteE = self.ReplicatedStorage:WaitForChild("__event__")
@@ -213,7 +223,7 @@ function Venometh.__initialize__()
 			end
 		end)
 	end
-	
+
 	return self
 end
 
@@ -223,21 +233,21 @@ function Venometh:Activate()
 end
 
 --Use this function whenever Venometh is required in a script
-function Venometh:Load()
+function Venometh:Wait()
 	repeat task.wait() until self._loaded
 	return self
 end
 
 --Implementation of a custom object instantiator that supports method chaining
 function Venometh.new(instance, parent)
-	
+
 	local msg = "\n\n"..string.rep(" ", 2).."[Venometh] "
 	if not instance or not (type(instance)  == "string" or typeof(instance) == "Instance") then
 		error(msg.."Instantiation Error: Argument 1 must be a valid string or Instance.\n")
-	elseif not parent or typeof(parent) ~= "Instance" then
+	elseif (not parent or typeof(parent) ~= "Instance") and parent ~= nil then
 		error(msg.."Instantiation Error: Argument 2 must be a valid Instance.\n")
 	end
-	
+
 	local tab = setmetatable({
 		_instance = (type(instance) == "string" and Instance.new(instance)) or instance
 	}, {
@@ -256,15 +266,20 @@ function Venometh.new(instance, parent)
 	return tab 
 end
 
+--Returns the container object
+function Venometh:GetContainer(container)
+	return self._containers[container]
+end
+
 --Used to display information or errors to the output
 function Venometh:Declare(func, msg)
-	
+
 	if not func or type(func) ~= "function" then
 		self:Declare(error, "Output Error: Argument 1 must be a valid function.")
 	elseif not msg or type(msg) ~= "string" then
 		self:Declare(error, "Output Error: Argument 2 must be a valid string.")	
 	end
-	
+
 	msg = "\n\n"..string.rep(" ", 2).."[Venometh] "..msg.."\n"
 	func = if func == debug.traceback then (function()
 		warn(msg)
@@ -275,12 +290,12 @@ end
 
 --Stores a function that can later be executed when a package is required in a script
 function Venometh:AddPackages(packages)
-	if packages and #packages == 0 and self._isServer then
+	if type(packages) ~= "table" or (packages and #packages == 0 and self._isServer) then
 		self:Declare(error, "Package Error: Cannot add Packages. Argument 1 must be a valid table of ModuleScript Instances.")
 	elseif packages and #packages == 0 and not self._isServer then
 		self:Declare(debug.traceback, "Package Warning: Cannot add certain Packages. Packages are not available on the client.")
 	end
-	
+
 	if not packages then
 		packages = game:FindFirstChild("Ven-Packages", true)
 		packages = packages and packages:GetChildren()
@@ -289,13 +304,15 @@ function Venometh:AddPackages(packages)
 			return
 		end
 	end
-	
+
 	for _, module in ipairs(packages) do
 		
-		if typeof(module) ~= "Instance" or not module:IsA("ModuleScript") then
+		if module:IsA("PackageLink") then
+			continue
+		elseif typeof(module) ~= "Instance" or not module:IsA("ModuleScript") then
 			self:Declare(error, "Package Error: Cannot add Packages. Argument 1 must be a valid table of ModuleScript Instances.")
 		end
-		
+
 		if self._isServer then table.insert(self._packageDump, module) end
 		self._packages[module.Name] = function(ven, included)
 			local p = require(module)
@@ -309,15 +326,15 @@ function Venometh:AddPackages(packages)
 	if self._isServer then self._remoteE:FireAllClients("AddPackages", packages) end
 end
 
- --Require the package and store the table internally in the Venometh Framework
+--Require the package and store the table internally in the Venometh Framework
 function Venometh:Include(package, include)
-	
+
 	if not package or type(package) ~= "string" then
-		self:Declare("Package Error: Cannot load Package. Argument 1 must be a valid string.")
+		self:Declare(error, "Package Error: Cannot load Package. Argument 1 must be a valid string.")
 	elseif include and type(include) ~= "boolean" then
-		self:Declare("Package Error: Cannot load Package. Argument 2 must be a valid boolean.")
+		self:Declare(error, "Package Error: Cannot load Package. Argument 2 must be a valid boolean.")
 	elseif not self._packages[package] then
-		self:Declare("Package Error: Cannot load Package. Package \""..package.."\" does not exist.")
+		self:Declare(error, "Package Error: Cannot load Package. Package \""..package.."\" does not exist.")
 	end
 	
 	if type(self._packages[package]) == "table" then
@@ -328,7 +345,7 @@ function Venometh:Include(package, include)
 	end
 	return self._packages[package](self, include)
 end
-	
+
 --Returns a table of packages that are internally stored in the Venometh Framework
 function Venometh:GetIncluded()
 	local includedPackages = {}
@@ -339,24 +356,24 @@ function Venometh:GetIncluded()
 	end
 	return includedPackages
 end
-	
+
 --Verify if a package is included internally in the Venometh Framework
 function Venometh:IsIncluded(package)
-	
+
 	if not package or type(package) ~= "string" then
 		self:Declare("Package Error: Argument 1 must be a valid string.")
 	end
-	
+
 	return type(self._packages[package]) == "table"
 end
-	
+
 --Adds reference to provided Containers
 function Venometh:AddContainers(containers)
-	
+
 	if not containers then
 		self:Declare(error, "Container Error: Cannot add Containers. Argument 1 must be a valid dictionary.")
 	end
-	
+
 	for container, data in pairs(containers) do
 		if type(data) ~= "table" then
 			self:Declare(error, "Container Error: Cannot add Containers. The container directories for \""..container.."\" must be a valid dictionary.")
@@ -369,5 +386,13 @@ function Venometh:AddContainers(containers)
 	end
 	self._containers = containers
 end
-	
+
+--Raises error if package was not included
+function Venometh:IncludeRequired(packageName)
+	if not packageName then
+		self:Declare(error, "Package Error: Argument 1 must be a valid string.")
+	end
+	self._ven:Declare(error, "Package Error: Package \"" + packageName + "\" must be included internally. Use Include(\"" + packageName + "\", true) instead.")
+end
+
 return Venometh.__initialize__()

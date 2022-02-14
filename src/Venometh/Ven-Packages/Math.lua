@@ -1,3 +1,6 @@
+--CREATED BY @V3N0M_Z
+--PART OF THE VENOMETH FRAMEWORK: https://github.com/V3N0M-Z/RBLX-Venometh
+
 local mathPackage = {}
 mathPackage.__index = mathPackage
 

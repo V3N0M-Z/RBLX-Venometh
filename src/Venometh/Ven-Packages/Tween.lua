@@ -1,3 +1,6 @@
+--CREATED BY @V3N0M_Z
+--PART OF THE VENOMETH FRAMEWORK: https://github.com/V3N0M-Z/RBLX-Venometh
+
 local tweenService = game:GetService("TweenService")
 local tween = {}
 tween.__index = tween
@@ -9,7 +12,7 @@ function tween.new(object, tweenData, tweenValues)
 	}, tween)
 end
 
-function tween:Wait(newThread, callback, ...)
+function tween:Wait(arnewThread, callback, ...)
 	local args = {...}
 	local function func()
 		self._tween.Completed:Wait()

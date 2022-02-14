@@ -1,16 +1,23 @@
+--CREATED BY @V3N0M_Z
+--PART OF THE VENOMETH FRAMEWORK: https://github.com/V3N0M-Z/RBLX-Venometh
+
 local network = {}
 network.__index = network
 
 function network.__initialize__(ven, included)
 	local self = setmetatable({
 		_ven = ven;
-		_com = ven.new("Folder", ven.ReplicatedStorage).Name("Communicators").get;
+		_storage = ven.new("Folder", ven.ReplicatedStorage).Name("Communicators").get;
 		_communicators = {};
 	}, network)
 	if not included then
-		self._ven:Declare(error, "Package Error: Package \"Network\" must be included internally. Use Include(\"Network\", true) instead.")
+		ven:IncludeRequired(script.Name)
 	end
 	return self
+end
+
+function network.__call(tab, ...)
+	return network.Get(tab, ...)
 end
 
 local runService = game:GetService("RunService")
@@ -59,26 +66,59 @@ communicator.__index = function(tab, index)
 	return getEvent(tab, index) or getFunction(tab, index) or communicator[index]
 end
 
-function network:GetCommunicator(com)
-	return (self._ven._isServer and setmetatable({
-		_events = self._communicators[com]._events;
-		_functions = self._communicators[com]._functions;
-	}, communicator)) or setmetatable(self._ven._remoteF:InvokeServer("GetCommunicator", com), communicator)
+--[[OLDER METHOD]]
+--function network:Get(com)
+--	return (self._ven._isServer and setmetatable({
+--		_events = self._communicators[com]._events;
+--		_functions = self._communicators[com]._functions;
+--	}, communicator)) or setmetatable(self._ven._remoteF:InvokeServer("GetCommunicator", com), communicator)
+--end
+
+function network:Get(...)
+	
+	local communicator, remote = table.unpack(...)
+	
+	if not runService:IsServer() then
+		local remote = self._ven._remoteF:InvokeServer("GetRemote", communicator, remote)
+		
+		if remote:IsA("RemoteFunction") then
+			return setmetatable({
+				InvokeServer = function(_, ...)
+					return remote:InvokeServer(...)
+				end;
+			}, {
+				__newindex = function(_, index, callback)
+					remote[index] = callback;
+				end;
+			})
+		end
+		
+		return {
+			FireServer = remote.FireServer;
+			OnClientEvent = remote.OnClientEvent;
+		}
+	end
+
+	return self._communicators[communicator]._events[remote] or self._communicators[communicator]._functions[remote]
+	
 end
 
-function network:AddCommunicators(communicators)
+function network:Add(communicators)
 	for communicator, data in pairs(communicators) do
-		local communicatorFolder = self._ven.new("Folder", self._com).Name(communicator).get
-		self._communicators[communicator] = {_events = {}, _functions = {}}
 		data = setmetatable(data, {__index = function() return {} end})
-		for _, event in ipairs(data.Events) do
-			self._communicators[communicator]._events[event] = self._ven.new("RemoteEvent", communicatorFolder).Name("").get
+		
+		local communicatorFolder = self._ven.new("Folder", self._storage).Name(communicator).get
+		self._communicators[communicator] = {_events = {}, _functions = {}}
+		
+		for _, remoteType in ipairs({ "Events", "Functions" }) do
+			for _, remote in ipairs(data[remoteType]) do
+				local _instance = remoteType == "Events" and Instance.new("RemoteEvent") or Instance.new("RemoteFunction")
+				self._communicators[communicator]["_"..string.lower(remoteType)][remote] = self._ven.new(_instance, communicatorFolder).Name("").get
+			end
 		end
+		
 		for event, func in pairs(data.BindEvents) do
 			self._communicators[communicator]._events[event].OnServerEvent:Connect(func)
-		end
-		for _, bFunc in ipairs(data.Functions) do
-			self._communicators[communicator]._functions[bFunc] = self._ven.new("RemoteFunction", communicatorFolder).Name("").get
 		end
 		for bFunc, func in pairs(data.BindFunctions) do
 			self._communicators[communicator]._functions[bFunc].OnServerInvoke = func
