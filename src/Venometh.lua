@@ -143,7 +143,7 @@ local function getObject(self, index)
 			end
 		end
 
-	--Client handler for Container
+		--Client handler for Container
 	else
 		return function(ven, instance, limit) return self._containers[source].Shared:WaitForChild(instance, limit or 7) end
 	end
@@ -180,7 +180,7 @@ function Venometh.__initialize__()
 		_packageDump = {};
 		_containers = {};
 		_loaded = false;
-		_isServer = Venometh.RunService:IsServer();
+		_isServer = Venometh._services.RunService:IsServer();
 	}, Venometh)
 
 	--Reference to Venometh.Packages
@@ -213,25 +213,29 @@ function Venometh.__initialize__()
 		AddPackages = function(...)
 			self:AddPackages(...)
 		end;
+		
+		AddContainers = function(...)
+			self:AddContainers(...)
+		end;
 	}
 
 	--Setup communication between the client/server Venometh Framework
 	if self._isServer then
-		
+
 		--Create communication remotes
 		self._remoteE = self.new("RemoteEvent", self.ReplicatedStorage).Name("__event__").get
 		self._remoteF = self.new("RemoteFunction", self.ReplicatedStorage).Name("__function__").get
-		
+
 		self._remoteF.OnServerInvoke = function(_, action, ...)
 
 			--When client-sided framework invokes server, stop local script execution until server-sided framework is fully loaded
 			repeat task.wait() until self._loaded
 
 			--Execute respective function
-			communications[action](_, ...)
+			return communications[action](_, ...)
 		end
 
-	--Setup client-sided communication
+		--Setup client-sided communication
 	else
 
 		--Wait until all remotes are created by server
@@ -239,8 +243,8 @@ function Venometh.__initialize__()
 		self._remoteE = self.ReplicatedStorage:WaitForChild("__event__")
 
 		--Get server information on respective data
-		self._containers = self._remoteF:InvokeServer("GetContainers")
-		self:AddPackages(self._remoteF:InvokeServer("GetPackages"))
+		self._containers = self._remoteF:InvokeServer("DumpContainers")
+		self:AddPackages(self._remoteF:InvokeServer("DumpPackages"))
 
 		--Fired by the server
 		self._remoteE.OnClientEvent:Connect(function(action, ...)
@@ -337,7 +341,7 @@ function Venometh:AddPackages(packages)
 	end
 
 	for _, module in ipairs(packages) do
-		
+
 		if module:IsA("PackageLink") then
 			continue
 		elseif typeof(module) ~= "Instance" or not module:IsA("ModuleScript") then
@@ -364,12 +368,12 @@ function Venometh:Include(package, include)
 
 	if type(package) ~= "string" then
 		self:Declare(error, "Package Error: Cannot load Package. Argument 1 must be a valid string.")
-	elseif type(include) ~= "boolean" then
+	elseif include and type(include) ~= "boolean" then
 		self:Declare(error, "Package Error: Cannot load Package. Argument 2 must be a valid boolean.")
 	elseif not self._packages[package] then
 		self:Declare(error, "Package Error: Cannot load Package. Package \""..package.."\" does not exist.")
 	end
-	
+
 	if type(self._packages[package]) == "table" then
 		return self._packages[package]
 	elseif include then
@@ -418,7 +422,8 @@ function Venometh:AddContainers(containers)
 		end
 		self._containers[container] = data
 	end
-
+	
+	if self._isServer then self._remoteE:FireAllClients("AddContainers", containers) end
 end
 
 --Raises error if package was not included
