@@ -10,9 +10,9 @@ function sound.__initialize__(ven)
 end
 
 -- Quickly play sounds located directly in assets folder
-function sound.QuickPlay(sound, parent)
+function sound.QuickPlay(audio, parent)
 	task.defer(function()
-		local audio = sound:Clone()
+		audio = audio:Clone()
 		audio.Parent = parent or sound._ven.SoundService
 		if not audio.IsLoaded then
 			audio.Loaded:Wait()
