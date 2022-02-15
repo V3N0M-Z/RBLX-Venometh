@@ -1,0 +1,32 @@
+site_name: Venometh
+site_url: https://v3n0m-z.github.io/RBLX-Venometh/
+repo_url: https://github.com/V3N0M-Z/RBLX-Venometh
+repo_name: V3N0M-Z/RBLX-Venometh
+
+# Local
+# site_url:
+# use_directory_urls: false
+
+theme:
+  name: material
+  favicon: assets/logo.png
+  logo: assets/logo.png
+  features:
+    - content.code.annotate
+  palette:
+    - scheme: slate
+      primary: black
+      accent: deep purple
+      
+
+nav:
+  - About: index.md
+  - Usage: usage.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - tables
+  - admonition
+  - pymdownx.inlinehilite
