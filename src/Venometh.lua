@@ -290,10 +290,11 @@ end
 
 --Stores a function that can later be executed when a package is required in a script
 function Venometh:AddPackages(packages)
-	if type(packages) ~= "table" or (packages and #packages == 0 and self._isServer) then
+	
+	if (type(packages) ~= "table" and packages ~= nil) or (packages and #packages == 0 and self._isServer) then
 		self:Declare(error, "Package Error: Cannot add Packages. Argument 1 must be a valid table of ModuleScript Instances.")
 	elseif packages and #packages == 0 and not self._isServer then
-		self:Declare(debug.traceback, "Package Warning: Cannot add certain Packages. Packages are not available on the client.")
+		self:Declare(debug.traceback, "Package Warning: Some Packages are not available on the client.")
 	end
 
 	if not packages then
