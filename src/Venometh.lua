@@ -120,15 +120,15 @@ local services = {
 }
 
 --Used to get objects from stored Containers
-local function getObject(tab, index)
+local function getObject(self, index)
 	local source = string.sub(index, 4)
 
 	--Return if no valid Container is found
-	if not tab._containers[source] then return end
+	if not self._containers[source] then return end
 
 	--Server handler for Container
-	if tab._isServer then
-		local protected, shared = tab._containers[source].Protected, tab._containers[source].Shared
+	if self._isServer then
+		local protected, shared = self._containers[source].Protected, self._containers[source].Shared
 		local singleDir = if not (protected and shared) then protected or shared else nil
 		if singleDir then
 			return function(ven, instance, limit) return singleDir:WaitForChild(instance, limit or 7) end
@@ -136,31 +136,39 @@ local function getObject(tab, index)
 			return function(ven, instance, limit)
 				local retrieved
 				local elapsed = os.clock()
-				task.spawn(function(instance, limit) retrieved = tab._containers[source].Protected:WaitForChild(instance, limit or 7) end)
-				task.spawn(function(instance, limit) retrieved = tab._containers[source].Shared:WaitForChild(instance, limit or 7) end)
+				task.spawn(function(instance, limit) retrieved = self._containers[source].Protected:WaitForChild(instance, limit or 7) end)
+				task.spawn(function(instance, limit) retrieved = self._containers[source].Shared:WaitForChild(instance, limit or 7) end)
 				repeat task.wait() until retrieved or os.clock() - elapsed >= (limit or 7)
 				return retrieved
 			end
 		end
 
-		--Client handler for Container
+	--Client handler for Container
 	else
-		return function(ven, instance, limit) return tab._containers[source].Shared:WaitForChild(instance, limit or 7) end
+		return function(ven, instance, limit) return self._containers[source].Shared:WaitForChild(instance, limit or 7) end
 	end
 end
 
---Framework metamethod/List of services
-local Venometh = {_services = (
-	function()
-		local t = {}
-		for _, service in ipairs(services) do
-			t[service] = game:GetService(service)
-		end
-		return t
-	end)()
+--Return services from services list
+local function getServices()
+	local t = {}
+	for _, service in ipairs(services) do
+		t[service] = game:GetService(service)
+	end
+	return t
+end
+
+--Framework metatable
+local Venometh = {
+	_services = getServices();
 }
-Venometh.__index = function(tab, index)
-	return (string.sub(index, 1, 3) == "Get" and getObject(tab, index)) or Venometh._services[index] or Venometh[index]
+
+--Index metamethod
+Venometh.__index = function(self, index)
+	if string.sub(index, 1, 3) == "Get" then
+		return getObject(self, index)
+	end
+	return Venometh._services[index] or Venometh[index]
 end
 
 --Framework instantiator
@@ -172,56 +180,75 @@ function Venometh.__initialize__()
 		_packageDump = {};
 		_containers = {};
 		_loaded = false;
+		_isServer = Venometh.RunService:IsServer();
 	}, Venometh)
-	self._isServer = self.RunService:IsServer()
 
 	--Reference to Venometh.Packages
 	self.Packages = setmetatable({}, {
-		__index  = function(tab, index)
-			if type(self._packages[index]) == "function" then
-				self:Declare(error, "Package Error: Cannot load package '"..index.."' this way. Package was not included internally.")
+		__index  = function(_, index)
+			if self._packages[index] and type(self._packages[index]) == "function" then
+				return self:Include(index);
+			else
+				self:Declare(error, "Package Error: Package \""..index.."\" does not exist.")
 			end
-			return self._packages[index]
 		end;
 	})
+
+	--Communication functions
+	local communications = {
+
+		DumpContainers = function()
+			return self._containers
+		end;
+
+		DumpPackages = function()
+			return self._packageDump
+		end;
+
+		GetRemote = function(_, ...)
+			local comm, remote = ...
+			return self._packages["Network"]._communicators[comm]._events[remote] or self._packages["Network"]._communicators[comm]._functions[remote]
+		end;
+
+		AddPackages = function(...)
+			self:AddPackages(...)
+		end;
+	}
 
 	--Setup communication between the client/server Venometh Framework
 	if self._isServer then
 		
+		--Create communication remotes
 		self._remoteE = self.new("RemoteEvent", self.ReplicatedStorage).Name("__event__").get
 		self._remoteF = self.new("RemoteFunction", self.ReplicatedStorage).Name("__function__").get
 		
-		self._remoteF.OnServerInvoke = function(client, action, ...)
+		self._remoteF.OnServerInvoke = function(_, action, ...)
+
+			--When client-sided framework invokes server, stop local script execution until server-sided framework is fully loaded
 			repeat task.wait() until self._loaded
-			if action == "GetContainers" then
-				return self._containers
-			elseif action == "GetPackages" then
-				return self._packageDump
-			elseif action == "GetRemote" then
-				
-				--[[OLDER METHOD]]
-				--elseif action == "GetCommunicator" then
-				--	return {
-				--		_events = self._packages["Network"]._communicators[...]._events;
-				--		_functions = self._packages["Network"]._communicators[...]._functions;
-				--	}
-				local network = self._packages["Network"]
-				local comm, remote = ...
-				return network._communicators[comm]._events[remote] or network._communicators[comm]._functions[remote]
-				
-			end
+
+			--Execute respective function
+			communications[action](_, ...)
 		end
 
+	--Setup client-sided communication
 	else
+
+		--Wait until all remotes are created by server
 		self._remoteF = self.ReplicatedStorage:WaitForChild("__function__")
 		self._remoteE = self.ReplicatedStorage:WaitForChild("__event__")
+
+		--Get server information on respective data
 		self._containers = self._remoteF:InvokeServer("GetContainers")
 		self:AddPackages(self._remoteF:InvokeServer("GetPackages"))
+
+		--Fired by the server
 		self._remoteE.OnClientEvent:Connect(function(action, ...)
-			if action == "AddPackages" then
-				self:AddPackages(...)
-			end
+
+			--Execute respective function
+			communications[action](...)
 		end)
+
 	end
 
 	return self
@@ -241,29 +268,32 @@ end
 --Implementation of a custom object instantiator that supports method chaining
 function Venometh.new(instance, parent)
 
-	local msg = "\n\n"..string.rep(" ", 2).."[Venometh] "
 	if not instance or not (type(instance)  == "string" or typeof(instance) == "Instance") then
-		error(msg.."Instantiation Error: Argument 1 must be a valid string or Instance.\n")
-	elseif (not parent or typeof(parent) ~= "Instance") and parent ~= nil then
-		error(msg.."Instantiation Error: Argument 2 must be a valid Instance.\n")
+		error("Instantiation Error: Argument 1 must be a valid string or Instance.\n")
+	elseif parent and typeof(parent) ~= "Instance" then
+		error("Instantiation Error: Argument 2 must be a valid Instance.\n")
 	end
 
-	local tab = setmetatable({
-		_instance = (type(instance) == "string" and Instance.new(instance)) or instance
+	local self = setmetatable({
+		_instance = if type(instance) == "string" then Instance.new(instance) else instance
 	}, {
-		__index = function(tab, index)
+		__index = function(self, index)
 			if string.lower(index) == "get" then
-				return tab._instance
+				return self._instance
 			else
-				if not pcall(function() return tab._instance[index] end) then
-					error(msg.."Instantiation Error: \".."..index.."\" is not a valid member of "..tab._instance.Name..".\n")
+				if not pcall(function() return self._instance[index] end) then
+					error("Instantiation Error: \".."..index.."\" is not a valid member of "..self._instance.Name..".\n")
 				end
-				return function(value) tab._instance[index] = value return tab end
+				return function(value)
+					self._instance[index] = value
+					return self
+				end
 			end
 		end
 	})
-	tab._instance.Parent = parent
-	return tab 
+	self._instance.Parent = parent
+
+	return self 
 end
 
 --Returns the container object
@@ -280,7 +310,7 @@ function Venometh:Declare(func, msg)
 		self:Declare(error, "Output Error: Argument 2 must be a valid string.")	
 	end
 
-	msg = "\n\n"..string.rep(" ", 2).."[Venometh] "..msg.."\n"
+	msg = string.format("\n\n  [Venometh] %s\n", msg)
 	func = if func == debug.traceback then (function()
 		warn(msg)
 		print(debug.traceback())
@@ -290,7 +320,7 @@ end
 
 --Stores a function that can later be executed when a package is required in a script
 function Venometh:AddPackages(packages)
-	
+
 	if (type(packages) ~= "table" and packages ~= nil) or (packages and #packages == 0 and self._isServer) then
 		self:Declare(error, "Package Error: Cannot add Packages. Argument 1 must be a valid table of ModuleScript Instances.")
 	elseif packages and #packages == 0 and not self._isServer then
@@ -315,6 +345,7 @@ function Venometh:AddPackages(packages)
 		end
 
 		if self._isServer then table.insert(self._packageDump, module) end
+
 		self._packages[module.Name] = function(ven, included)
 			local p = require(module)
 			if type(p) == "table" and p["__initialize__"] then
@@ -324,15 +355,16 @@ function Venometh:AddPackages(packages)
 			end
 		end
 	end
+
 	if self._isServer then self._remoteE:FireAllClients("AddPackages", packages) end
 end
 
 --Require the package and store the table internally in the Venometh Framework
 function Venometh:Include(package, include)
 
-	if not package or type(package) ~= "string" then
+	if type(package) ~= "string" then
 		self:Declare(error, "Package Error: Cannot load Package. Argument 1 must be a valid string.")
-	elseif include and type(include) ~= "boolean" then
+	elseif type(include) ~= "boolean" then
 		self:Declare(error, "Package Error: Cannot load Package. Argument 2 must be a valid boolean.")
 	elseif not self._packages[package] then
 		self:Declare(error, "Package Error: Cannot load Package. Package \""..package.."\" does not exist.")
@@ -384,8 +416,9 @@ function Venometh:AddContainers(containers)
 				self:Declare(error, "Container Error: Invalid "..key.." directory for Container \""..container.."\".")
 			end
 		end
+		self._containers[container] = data
 	end
-	self._containers = containers
+
 end
 
 --Raises error if package was not included
