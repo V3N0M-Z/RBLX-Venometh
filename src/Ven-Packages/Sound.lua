@@ -5,14 +5,15 @@ local sound = {}
 sound.__index = sound
 
 function sound.__initialize__(ven)
-	return setmetatable({_ven = ven}, sound)
+	sound._ven = ven
+	return sound	
 end
 
 -- Quickly play sounds located directly in assets folder
-function sound:QuickPlay(sound, parent)
+function sound.QuickPlay(sound, parent)
 	task.defer(function()
 		local audio = sound:Clone()
-		audio.Parent = parent or self._ven.SoundService
+		audio.Parent = parent or sound._ven.SoundService
 		if not audio.IsLoaded then
 			audio.Loaded:Wait()
 		end
