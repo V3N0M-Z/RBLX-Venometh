@@ -67,8 +67,6 @@ str-<start>.<end>
 
 local str = {}
 
-str.__index = str
-
 str.__unm = function(t)
 	return t._str
 end
