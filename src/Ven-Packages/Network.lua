@@ -11,7 +11,7 @@ function network.__initialize__(ven, included)
 		_communicators = {};
 	}, network)
 	if not included then
-		ven:IncludeRequired(script.Name)
+		ven:IncludeError(script.Name)
 	end
 	return self
 end

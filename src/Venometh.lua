@@ -388,7 +388,7 @@ function Venometh:AddContainers(containers)
 end
 
 --Raises error if package was not included
-function Venometh:IncludeRequired(packageName)
+function Venometh:IncludeError(packageName)
 	if not packageName then
 		self:Declare(error, "Package Error: Argument 1 must be a valid string.")
 	end
