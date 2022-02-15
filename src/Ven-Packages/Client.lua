@@ -1,13 +1,14 @@
 --CREATED BY @V3N0M_Z
 --PART OF THE VENOMETH FRAMEWORK: https://github.com/V3N0M-Z/RBLX-Venometh
 
-local accessibles = {
+local public = {
 	Client = "_client";
 	PlayerGui = "_playerGui";
 }
+
 local client = {}
-client.__index = function(tab, index)
-	return client[index] or (accessibles[index] and tab[accessibles[index]])
+client.__index = function(self, index)
+	return client[index] or (public[index] and client[public[index]])
 end
 
 --Store Player Instance and PlayerGui at initalization
@@ -22,7 +23,7 @@ function client.__initialize__(ven, include)
 		ven:IncludeError("Client")
 	end
 	
-	return client
+	return setmetatable({}, client)
 end
 
 --Get character method
@@ -89,6 +90,5 @@ function client.Load(ui, loadingBar, callback)
 	ui:Destroy()
 
 end
-
 
 return client
