@@ -186,7 +186,7 @@ function Venometh.__initialize__()
 	--Reference to Venometh.Packages
 	self.Packages = setmetatable({}, {
 		__index  = function(_, index)
-			if self._packages[index] and type(self._packages[index]) == "function" then
+			if self._packages[index] then
 				return self:Include(index);
 			else
 				self:Declare(error, "Package Error: Package \""..index.."\" does not exist.")
@@ -195,7 +195,7 @@ function Venometh.__initialize__()
 	})
 
 	--Communication functions
-	local communications = {
+	self._communicationFunctions = {
 
 		DumpContainers = function()
 			return self._containers
@@ -205,10 +205,10 @@ function Venometh.__initialize__()
 			return self._packageDump
 		end;
 
-		GetRemote = function(_, ...)
-			local comm, remote = ...
-			return self._packages["Network"]._communicators[comm]._events[remote] or self._packages["Network"]._communicators[comm]._functions[remote]
-		end;
+		--GetRemote = function(_, ...)
+		--	local comm, remote = ...
+		--	return self._packages["Network"]._communicators[comm]._events[remote] or self._packages["Network"]._communicators[comm]._functions[remote]
+		--end;
 
 		AddPackages = function(...)
 			self:AddPackages(...)
@@ -232,8 +232,15 @@ function Venometh.__initialize__()
 			repeat task.wait() until self._loaded
 
 			--Execute respective function
-			return communications[action](_, ...)
+			if not self._communicationFunctions[action] then return end
+			return self._communicationFunctions[action](_, ...)
 		end
+		
+		self._remoteE.OnServerEvent:Connect(function(client, action, ...)
+			repeat task.wait() until self._loaded
+			if not self._communicationFunctions[action] then return end
+			self._communicationFunctions[action](client, ...)
+		end)
 
 		--Setup client-sided communication
 	else
@@ -248,9 +255,10 @@ function Venometh.__initialize__()
 
 		--Fired by the server
 		self._remoteE.OnClientEvent:Connect(function(action, ...)
-
+			
 			--Execute respective function
-			communications[action](...)
+			if not self._communicationFunctions[action] then return end
+			self._communicationFunctions[action](...)
 		end)
 
 	end
@@ -267,6 +275,40 @@ end
 function Venometh:Wait()
 	repeat task.wait() until self._loaded
 	return self
+end
+
+function Venometh:IsServer()
+	return self._isServer
+end
+
+function Venometh:Register(action, callback)
+	if self._communicationFunctions[action] then
+		self:Declare(error, "Internal Error: Cannot call Register() with \""..action.."\". Already exists!")
+	end
+	self._communicationFunctions[action] = callback
+end
+
+function Venometh:UnRegister(action)
+	if self._communicationFunctions[action] then
+		self._communicationFunctions[action] = nil
+	end
+end
+
+function Venometh:Fire(...)
+	local method = if self._isServer then self._remoteE.FireClient else self._remoteE.FireServer
+	method(self._remoteE, ...)
+end
+
+function Venometh:FireAllClients(...)
+	if not self._isServer then return end
+	for _, plr in ipairs(self.Players:GetPlayers()) do
+		self:Fire(plr, ...)
+	end
+end
+
+function Venometh:Invoke(...)
+	local method = if self._isServer then self._remoteF.InvokeClient else self._remoteF.InvokeServer
+	return method(self._remoteF, ...)
 end
 
 --Implementation of a custom object instantiator that supports method chaining
@@ -295,13 +337,13 @@ function Venometh.new(instance, parent)
 			end
 		end
 	})
-	self._instance.Parent = parent
+	self._instance.Parent = if parent then parent else self._instance.Parent
 
 	return self 
 end
 
 --Returns the container object
-function Venometh:GetContainer(container)
+function Venometh:Container(container)
 	return self._containers[container]
 end
 
@@ -431,7 +473,7 @@ function Venometh:IncludeError(packageName)
 	if not packageName then
 		self:Declare(error, "Package Error: Argument 1 must be a valid string.")
 	end
-	self._ven:Declare(error, "Package Error: Package \"" + packageName + "\" must be included internally. Use Include(\"" + packageName + "\", true) instead.")
+	self:Declare(error, "Package Error: Package \"" .. packageName .. "\" must be included internally. Use Include(\"" .. packageName .. "\", true) instead.")
 end
 
 return Venometh.__initialize__()
