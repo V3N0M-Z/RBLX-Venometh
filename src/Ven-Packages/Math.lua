@@ -15,4 +15,8 @@ function mathPackage.MapRange(input, output)
 	return function(x) return((x - inputMin) * (outputMax - outputMin) / (inputMax - inputMin) + outputMin) end
 end
 
+function mathPackage.InRange(range, value)
+	return value >= range.Min and value <= range.Max
+end
+
 return mathPackage
