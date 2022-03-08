@@ -6,21 +6,44 @@ sound.__index = sound
 
 function sound.__initialize__(ven)
 	sound._ven = ven
-	return sound	
+	return sound
 end
 
--- Quickly play sounds located directly in assets folder
-function sound.QuickPlay(audio, parent)
+function sound.new(instance)
+	return setmetatable({
+		_audio = instance:Clone();
+	}, sound)
+end
+
+function sound:Play(parent)
 	task.defer(function()
-		audio = audio:Clone()
-		audio.Parent = parent or sound._ven.SoundService
-		if not audio.IsLoaded then
-			audio.Loaded:Wait()
-		end
-		audio:Play()
-		audio.Ended:Wait()
-		audio:Destroy()
+		self._audio.Parent = parent or self._ven.SoundService
+		self:Load()
+		self._audio:Play()
 	end)
+	return self
+end
+
+function sound:QuickPlay(parent)
+	task.defer(function(parent)
+		self:Play(parent):Wait():Destroy()
+	end)
+end
+
+function sound:Load()
+	if not self._audio.IsLoaded then
+		self._audio.Loaded:Wait()
+	end
+end
+
+function sound:Wait()
+	self._audio.Ended:Wait()
+	return self
+end
+
+function sound:Destroy()
+	self._audio:Destroy()
+	setmetatable(self, nil)
 end
 
 return sound
