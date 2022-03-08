@@ -5,14 +5,21 @@ local network = {}
 network.__index = network
 
 function network.__initialize__(ven, included)
+	if not included then
+		ven:IncludeError(script.Name)
+	end
+	
 	local self = setmetatable({
 		_ven = ven;
 		_storage = ven.new("Folder", ven.ReplicatedStorage).Name("Communicators").get;
 		_communicators = {};
 	}, network)
-	if not included then
-		ven:IncludeError(script.Name)
-	end
+	
+	ven:Register("GetRemote", function(_, ...)
+		local comm, remote = ...
+		return self._communicators[comm]._events[remote] or self._communicators[comm]._functions[remote]
+	end)
+	
 	return self
 end
 
@@ -20,51 +27,51 @@ function network.__call(tab, ...)
 	return network.Get(tab, ...)
 end
 
-local runService = game:GetService("RunService")
-local RBXScriptSignals = {
-	"OnClientEvent";
-	"OnServerEvent";
-}
-local function getEvent(tab, index)
-	if not tab._events[index] then return end
-	if runService:IsServer() then
-		return {
-			OnServerEvent = tab._events[index].OnServerEvent;
-			FireClient = function(_, client, ...) tab._events[index]:FireClient(client, ...) end;
-			FireAllClients = function(_, ...) tab._events[index]:FireAllClients(...) end;
-		}
-	else
-		return {
-			OnClientEvent = tab._events[index].OnClientEvent;
-			FireServer = function(_, ...) tab._events[index]:FireServer(...) end;
-		}
-	end
-end
-local function getFunction(tab, index, func)
-	if not tab._functions[index] then return end
-	if runService:IsServer() then
-		return setmetatable({
-			InvokeClient = function(_, client, ...) return tab._functions[index]:InvokeClient(client, ...) end;
-		}, {
-			__newindex = function(_, _, func)
-				tab._functions[index].OnServerInvoke = func
-			end;
-		})
-	else
-		return setmetatable({
-			InvokeServer = function(_, ...) return tab._functions[index]:InvokeServer(...) end;
-		}, {
-			__newindex = function(_, _, func)
-				tab._functions[index].OnClientInvoke = func
-			end;
-		})
-	end
-end
+--local RBXScriptSignals = {
+--	"OnClientEvent";
+--	"OnServerEvent";
+--}
+--local function getEvent(self, index)
+--	if not self._events[index] then return end
+--	if runService:IsServer() then
+--		return {
+--			OnServerEvent = self._events[index].OnServerEvent;
+--			FireClient = function(_, client, ...) self._events[index]:FireClient(client, ...) end;
+--			FireAllClients = function(_, ...) self._events[index]:FireAllClients(...) end;
+--		}
+--	else
+--		return {
+--			OnClientEvent = self._events[index].OnClientEvent;
+--			FireServer = function(_, ...) self._events[index]:FireServer(...) end;
+--		}
+--	end
+--end
+--local function getFunction(tab, index, func)
+--	if not tab._functions[index] then return end
+--	if runService:IsServer() then
+--		return setmetatable({
+--			InvokeClient = function(_, client, ...) return tab._functions[index]:InvokeClient(client, ...) end;
+--		}, {
+--			__newindex = function(_, _, func)
+--				tab._functions[index].OnServerInvoke = func
+--			end;
+--		})
+--	else
+--		return setmetatable({
+--			InvokeServer = function(_, ...) return tab._functions[index]:InvokeServer(...) end;
+--		}, {
+--			__newindex = function(_, _, func)
+--				tab._functions[index].OnClientInvoke = func
+--			end;
+--		})
+--	end
+--end
 
 local communicator = {}
-communicator.__index = function(tab, index)
-	return getEvent(tab, index) or getFunction(tab, index) or communicator[index]
-end
+communicator.__index = communicator
+--communicator.__index = function(tab, index)
+--	return getEvent(tab, index) or getFunction(tab, index) or communicator[index]
+--end
 
 --[[OLDER METHOD]]
 --function network:Get(com)
@@ -78,8 +85,8 @@ function network:Get(...)
 	
 	local communicator, remote = table.unpack(...)
 	
-	if not runService:IsServer() then
-		local remote = self._ven._remoteF:InvokeServer("GetRemote", communicator, remote)
+	if not self._ven:IsServer() then
+		local remote = self._ven:Invoke("GetRemote", communicator, remote)
 		
 		if remote:IsA("RemoteFunction") then
 			return setmetatable({
@@ -94,7 +101,9 @@ function network:Get(...)
 		end
 		
 		return {
-			FireServer = remote.FireServer;
+			FireServer = function(_, ...)
+				remote:FireServer(...)
+			end;
 			OnClientEvent = remote.OnClientEvent;
 		}
 	end
@@ -104,6 +113,9 @@ function network:Get(...)
 end
 
 function network:Add(communicators)
+	
+	if not self._ven:IsServer() then return end
+	
 	for communicator, data in pairs(communicators) do
 		data = setmetatable(data, {__index = function() return {} end})
 		
