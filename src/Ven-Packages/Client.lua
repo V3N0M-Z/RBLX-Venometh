@@ -28,11 +28,14 @@ end
 
 --Get character method
 function client.GetCharacter(yield)
-	if client._client.Character and client._client.Character.Parent ~= nil then
-		return client._client.Character, client._client.Character.Humanoid, client._client.Character.HumanoidRootPart
+	
+	if client._client.Character and client._client.Character.Parent ~= nil then		
+		return client._client.Character, client._client.Character:WaitForChild("Humanoid", 7), client._client.Character:WaitForChild("HumanoidRootPart", 7)
 	end
-	if not yield then return nil end
-	return client._client.CharacterAdded:Wait(), client._client.Character:WaitForChild("Humanoid"), client._client.Character:WaitForChild("HumanoidRootPart")
+	
+	if not yield then return end
+	
+	return client._client.CharacterAdded:Wait(), client._client.Character:WaitForChild("Humanoid", 7), client._client.Character:WaitForChild("HumanoidRootPart", 7)
 end
 
 
@@ -68,6 +71,7 @@ function client.Load(ui, loadingBar, callback)
 	.ZIndex(100)
 	.BackgroundColor3(Color3.fromHSV(0, 0, 0))
 	.BackgroundTransparency(1)
+	.Name("Overlay")
 	.Parent(ui).get
 
 	client._tween.new(overlay, 3, {
@@ -80,7 +84,7 @@ function client.Load(ui, loadingBar, callback)
 	end
 	
 	if callback then
-		callback()
+		callback(ui)
 	end
 
 	client._tween.new(overlay, 3, {
